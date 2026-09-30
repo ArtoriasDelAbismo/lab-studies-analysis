@@ -39,6 +39,13 @@ function safePath(value: string | undefined): string {
   return "/upload";
 }
 
+const LOVABLE_HOSTS = ["lovable.app", "lovableproject.com", "lovable.dev"];
+
+function isLovableHost(): boolean {
+  const host = window.location.hostname;
+  return LOVABLE_HOSTS.some((zone) => host === zone || host.endsWith(`.${zone}`));
+}
+
 function AuthPage() {
   const { redirect } = Route.useSearch();
   const { session, loading } = useAuth();
@@ -86,6 +93,15 @@ function AuthPage() {
     setBusy(true);
     try {
       sessionStorage.setItem("post-auth-path", safePath(redirect));
+      // The Lovable OAuth broker (/~oauth) only exists on Lovable hosting; elsewhere use Supabase directly.
+      if (!isLovableHost()) {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: { redirectTo: window.location.origin },
+        });
+        if (error) toast.error(t("googleError"));
+        return;
+      }
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
       });
